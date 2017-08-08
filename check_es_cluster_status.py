@@ -3,6 +3,7 @@ from nagioscheck import NagiosCheck, UsageError
 from nagioscheck import PerformanceMetric, Status
 import urllib2
 import optparse
+import base64
 
 try:
     import json
@@ -18,14 +19,23 @@ class ESClusterHealthCheck(NagiosCheck):
 
         self.add_option('H', 'host', 'host', 'The cluster to check')
         self.add_option('P', 'port', 'port', 'The ES port - defaults to 9200')
+        self.add_option('u', 'username', 'username', 'Username for authentication')
+        self.add_option('p', 'password', 'password', 'password for authentication')
 
     def check(self, opts, args):
         host = opts.host
         port = int(opts.port or '9200')
+        username = opts.username
+        password = opts.password
 
         try:
-            response = urllib2.urlopen(r'http://%s:%d/_cluster/health'
-                                       % (host, port))
+            url = r'http://%s:%d/_cluster/health' % (host, port)
+            request = urllib2.Request(url)
+            if username is not None and password is not None:
+                base64string = base64.encodestring('%s:%s' % (username, password)).replace('\n', '')
+                request.add_header("Authorization", "Basic %s" % base64string)
+            response = urllib2.urlopen(request)
+
         except urllib2.HTTPError, e:
             raise Status('unknown', ("API failure", None,
                          "API failure:\n\n%s" % str(e)))
